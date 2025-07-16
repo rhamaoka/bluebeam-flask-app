@@ -7,9 +7,6 @@ app = Flask(__name__)
 
 SCOPES = ['https://www.googleapis.com/auth/drive.readonly']
 SERVICE_ACCOUNT_FILE = 'credentials.json'
-credentials = service_account.Credentials.from_service_account_file(
-    SERVICE_ACCOUNT_FILE, scopes=SCOPES)
-drive_service = build('drive', 'v3', credentials=credentials)
 
 @app.route('/')
 def home():
@@ -17,7 +14,7 @@ def home():
 
 @app.route('/upload', methods=['POST'])
 def upload_files():
-    debug_info = []  # Create a list to store debug messages clearly
+    debug_info = []  # List to store debug messages
 
     data = request.json
     session_id = data.get('sessionId')
@@ -43,7 +40,8 @@ def upload_files():
     try:
         files = drive_service.files().list(
             q=f"'{drive_folder_id}' in parents and mimeType='application/pdf'",
-            fields="files(id, name)").execute().get('files', [])
+            fields="files(id, name)"
+        ).execute().get('files', [])
         debug_info.append(f"Found {len(files)} PDF files in Google Drive folder.")
     except Exception as e:
         debug_info.append(f"Error fetching files from Google Drive: {str(e)}")
@@ -63,12 +61,13 @@ def upload_files():
             continue  # Move to next file
 
         try:
-             debug_info.append(f"Sending this payload to Bluebeam: {{'Name': '{file_name}'}}")    
+            debug_info.append(f"Sending this payload to Bluebeam: {{'Name': '{file_name}'}}")
             metadata_resp = requests.post(
                 f"https://studioapi.bluebeam.com/publicapi/v1/sessions/{session_id}/files",
                 json={"Name": file_name},
-                headers={"Authorization": f"Bearer {bluebeam_access_token}",
-                         "Content-Type": "application/json"
+                headers={
+                    "Authorization": f"Bearer {bluebeam_access_token}",
+                    "Content-Type": "application/json"
                 }
             )
             metadata_resp.raise_for_status()
@@ -76,10 +75,14 @@ def upload_files():
             upload_url = metadata['UploadUrl']
             file_id = metadata['Id']
 
-            upload_resp = requests.put(upload_url, data=file_data, headers={
-                'Content-Type': 'application/pdf',
-                'x-amz-server-side-encryption': 'AES256'
-            })
+            upload_resp = requests.put(
+                upload_url,
+                data=file_data,
+                headers={
+                    'Content-Type': 'application/pdf',
+                    'x-amz-server-side-encryption': 'AES256'
+                }
+            )
             upload_resp.raise_for_status()
 
             confirm_resp = requests.post(
