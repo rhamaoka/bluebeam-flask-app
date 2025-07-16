@@ -42,8 +42,8 @@ def upload_files():
 
     try:
         files = drive_service.files().list(
-            q=f"'{drive_folder_id}' in parents and mimeType='application/pdf'",
-            fields="files(id, name)").execute().get('files', [])
+    q=f"'{drive_folder_id}' in parents",
+    fields="files(id, name, mimeType)").execute().get('files', [])
         debug_info.append(f"Found {len(files)} PDF files in Google Drive folder.")
     except Exception as e:
         debug_info.append(f"Error fetching files from Google Drive: {str(e)}")
