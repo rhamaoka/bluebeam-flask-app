@@ -42,8 +42,8 @@ def upload_files():
 
     try:
         files = drive_service.files().list(
-    q=f"'{drive_folder_id}' in parents",
-    fields="files(id, name, mimeType)").execute().get('files', [])
+            q=f"'{drive_folder_id}' in parents and mimeType='application/pdf'",
+            fields="files(id, name)").execute().get('files', [])
         debug_info.append(f"Found {len(files)} PDF files in Google Drive folder.")
     except Exception as e:
         debug_info.append(f"Error fetching files from Google Drive: {str(e)}")
@@ -63,10 +63,13 @@ def upload_files():
             continue  # Move to next file
 
         try:
+             debug_info.append(f"Sending this payload to Bluebeam: {{'Name': '{file_name}'}}")    
             metadata_resp = requests.post(
                 f"https://studioapi.bluebeam.com/publicapi/v1/sessions/{session_id}/files",
                 json={"Name": file_name},
-                headers={"Authorization": f"Bearer {bluebeam_access_token}"}
+                headers={"Authorization": f"Bearer {bluebeam_access_token}",
+                         "Content-Type": "application/json"
+                }
             )
             metadata_resp.raise_for_status()
             metadata = metadata_resp.json()
