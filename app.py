@@ -28,6 +28,7 @@ def upload_files():
         debug_info.append("Error: Missing parameters")
         return jsonify({"error": "Missing parameters", "debug": debug_info}), 400
 
+    # Authenticate with Google Drive
     try:
         credentials = service_account.Credentials.from_service_account_file(
             SERVICE_ACCOUNT_FILE, scopes=SCOPES)
@@ -37,10 +38,13 @@ def upload_files():
         debug_info.append(f"Google Drive authentication error: {str(e)}")
         return jsonify({"error": "Google authentication failed", "debug": debug_info}), 500
 
+    # Fetch PDF files from Google Drive (including shared drives)
     try:
         files = drive_service.files().list(
             q=f"'{drive_folder_id}' in parents and mimeType='application/pdf'",
-            fields="files(id, name, webViewLink)"
+            fields="files(id, name, webViewLink)",
+            supportsAllDrives=True,
+            includeItemsFromAllDrives=True
         ).execute().get('files', [])
         debug_info.append(f"Found {len(files)} PDF files in Google Drive folder.")
     except Exception as e:
@@ -54,9 +58,12 @@ def upload_files():
         file_url = f"https://drive.google.com/file/d/{file_id}/view?usp=drive_link"
         debug_info.append(f"Processing file: {file_name} with URL: {file_url}")
 
-        # Download the file data from Google Drive
+        # Download the file data from Google Drive (supporting shared drives)
         try:
-            file_data = drive_service.files().get_media(fileId=file_id).execute()
+            file_data = drive_service.files().get_media(
+                fileId=file_id,
+                supportsAllDrives=True
+            ).execute()
             debug_info.append(f"Downloaded file '{file_name}' from Google Drive.")
         except Exception as e:
             debug_info.append(f"Error downloading '{file_name}': {str(e)}")
