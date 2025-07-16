@@ -41,7 +41,7 @@ def upload_files():
     # Fetch PDF files from Google Drive (including shared drives)
     try:
         files = drive_service.files().list(
-            q=f"'{drive_folder_id}' in parents and mimeType='application/pdf'",
+            q=f"'{drive_folder_id}' in parents and mimeType='application/pdf' and trashed=false",
             fields="files(id, name, webViewLink)",
             supportsAllDrives=True,
             includeItemsFromAllDrives=True
