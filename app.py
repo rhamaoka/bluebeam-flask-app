@@ -40,7 +40,7 @@ def upload_files():
     try:
         files = drive_service.files().list(
             q=f"'{drive_folder_id}' in parents and mimeType='application/pdf'",
-            fields="files(id, name)"
+            fields="files(id, name, webViewLink)"
         ).execute().get('files', [])
         debug_info.append(f"Found {len(files)} PDF files in Google Drive folder.")
     except Exception as e:
@@ -50,30 +50,43 @@ def upload_files():
     results = []
     for file in files:
         file_name = file['name']
-        debug_info.append(f"Processing file: {file_name}")
+        file_id = file['id']
+        file_url = f"https://drive.google.com/file/d/{file_id}/view?usp=drive_link"
+        debug_info.append(f"Processing file: {file_name} with URL: {file_url}")
 
+        # Download the file data from Google Drive
         try:
-            file_data = drive_service.files().get_media(fileId=file['id']).execute()
+            file_data = drive_service.files().get_media(fileId=file_id).execute()
             debug_info.append(f"Downloaded file '{file_name}' from Google Drive.")
         except Exception as e:
             debug_info.append(f"Error downloading '{file_name}': {str(e)}")
             results.append({"file": file_name, "status": "download failed"})
             continue  # Move to next file
 
+        # Upload file to Bluebeam Studio
         try:
-            debug_info.append(f"Sending this payload to Bluebeam: {{'Name': '{file_name}'}}")
+            payload = {
+                "Name": file_name,
+                "Source": file_url
+            }
+            debug_info.append(f"Sending payload to Bluebeam: {payload}")
+
             metadata_resp = requests.post(
                 f"https://studioapi.bluebeam.com/publicapi/v1/sessions/{session_id}/files",
-                json={"Name": file_name},
+                json=payload,
                 headers={
                     "Authorization": f"Bearer {bluebeam_access_token}",
                     "Content-Type": "application/json"
                 }
             )
-            metadata_resp.raise_for_status()
+
+            if metadata_resp.status_code != 200:
+                debug_info.append(f"Bluebeam response: {metadata_resp.status_code} - {metadata_resp.text}")
+                metadata_resp.raise_for_status()
+
             metadata = metadata_resp.json()
             upload_url = metadata['UploadUrl']
-            file_id = metadata['Id']
+            bluebeam_file_id = metadata['Id']
 
             upload_resp = requests.put(
                 upload_url,
@@ -86,7 +99,7 @@ def upload_files():
             upload_resp.raise_for_status()
 
             confirm_resp = requests.post(
-                f"https://studioapi.bluebeam.com/publicapi/v1/sessions/{session_id}/files/{file_id}/confirm-upload",
+                f"https://studioapi.bluebeam.com/publicapi/v1/sessions/{session_id}/files/{bluebeam_file_id}/confirm-upload",
                 headers={"Authorization": f"Bearer {bluebeam_access_token}"}
             )
             confirm_resp.raise_for_status()
